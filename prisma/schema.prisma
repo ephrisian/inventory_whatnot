@@ -1,0 +1,307 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum ItemStatus {
+  IN_STOCK
+  SOLD
+  RESERVED
+  NEEDS_RESTOCK
+  DISCONTINUED
+}
+
+enum Platform {
+  WHATNOT
+  EBAY
+  PAYPAL
+  DISCORD
+  INSTAGRAM
+  OTHER
+}
+
+enum OrderStatus {
+  ORDERED
+  IN_TRANSIT
+  ARRIVED
+  CANCELLED
+}
+
+enum InterestLevel {
+  HOT
+  WARM
+  COLD
+}
+
+enum FollowupStatus {
+  WAITING
+  RESPONDED
+  ORDERED
+  COMPLETED
+}
+
+// Core Models
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String?  // For UI display
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  items       Item[]
+}
+
+model Fandom {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  color       String?  // For UI display
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  items       Item[]
+}
+
+model Item {
+  id          String     @id @default(cuid())
+  name        String
+  description String?
+  cost        Float
+  quantity    Int        @default(0)
+  images      String?    // JSON array of image URLs/paths
+  status      ItemStatus @default(IN_STOCK)
+  sku         String?    @unique
+  notes       String?
+  
+  // Relationships
+  categoryId  String?
+  category    Category?  @relation(fields: [categoryId], references: [id])
+  fandomId    String?
+  fandom      Fandom?    @relation(fields: [fandomId], references: [id])
+  
+  // Tracking
+  totalValue  Float?     // calculated field: cost * quantity
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  // Relations
+  sales       Sale[]
+  orderItems  VendorOrderItem[]
+  packItems   PackItem[]
+  customerInterests CustomerInterest[]
+}
+
+model Sale {
+  id            String   @id @default(cuid())
+  platform      Platform
+  soldPrice     Float
+  shippingCost  Float    @default(0)
+  materialsCost Float    @default(0)
+  platformFeePercent Float @default(0)
+  platformFeeFlat    Float @default(0)
+  saleDate      DateTime @default(now())
+  notes         String?
+  
+  // Calculated fields
+  platformFeeTotal Float? // (soldPrice * platformFeePercent/100) + platformFeeFlat
+  breakEvenPrice   Float? // cost + materialsCost + shippingCost + platformFeeTotal
+  netProfit        Float? // soldPrice - cost - materialsCost - shippingCost - platformFeeTotal
+  
+  // Relationships
+  itemId        String
+  item          Item     @relation(fields: [itemId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Vendor {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  contactInfo String?
+  website     String?
+  notes       String?
+  isActive    Boolean  @default(true)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  orders      VendorOrder[]
+  boxes       Box[]
+}
+
+model VendorOrder {
+  id          String      @id @default(cuid())
+  orderNumber String?
+  orderDate   DateTime    @default(now())
+  status      OrderStatus @default(ORDERED)
+  totalCost   Float?
+  notes       String?
+  
+  // Relationships
+  vendorId    String
+  vendor      Vendor      @relation(fields: [vendorId], references: [id])
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  
+  items       VendorOrderItem[]
+}
+
+model VendorOrderItem {
+  id          String      @id @default(cuid())
+  quantity    Int
+  costPerUnit Float
+  totalCost   Float       // quantity * costPerUnit
+  
+  // Relationships
+  orderId     String
+  order       VendorOrder @relation(fields: [orderId], references: [id])
+  itemId      String
+  item        Item        @relation(fields: [itemId], references: [id])
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Box {
+  id           String   @id @default(cuid())
+  name         String
+  costPerBox   Float
+  totalPacks   Int
+  description  String?
+  images       String?  // JSON array of image URLs/paths
+  
+  // Relationships
+  vendorId     String?
+  vendor       Vendor?  @relation(fields: [vendorId], references: [id])
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  packs        Pack[]
+}
+
+model Pack {
+  id              String   @id @default(cuid())
+  name            String
+  materialsCost   Float    @default(0)
+  shippingCost    Float    @default(0)
+  suggestedPrice  Float?   // Auto-calculated: (totalCost / 0.88) rounded up
+  quantity        Int      @default(0)
+  notes           String?
+  
+  // Calculated fields
+  costPerPack     Float?   // box.costPerBox / box.totalPacks
+  totalCost       Float?   // costPerPack + materialsCost + shippingCost
+  
+  // Relationships
+  boxId           String
+  box             Box      @relation(fields: [boxId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           PackItem[]
+}
+
+model PackItem {
+  id          String   @id @default(cuid())
+  quantity    Int      @default(1)
+  notes       String?
+  
+  // Relationships
+  packId      String
+  pack        Pack     @relation(fields: [packId], references: [id])
+  itemId      String
+  item        Item     @relation(fields: [itemId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CustomerInterest {
+  id              String         @id @default(cuid())
+  customerName    String
+  username        String?
+  platform        Platform
+  interestLevel   InterestLevel
+  restockNeeded   Boolean        @default(false)
+  followupStatus  FollowupStatus @default(WAITING)
+  notes           String?
+  dateRequested   DateTime       @default(now())
+  
+  // Relationships
+  itemId          String
+  item            Item           @relation(fields: [itemId], references: [id])
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model EbayScanSession {
+  id              String   @id @default(cuid())
+  sellerUsername  String
+  totalItems      Int      @default(0)
+  interestedItems Int      @default(0)
+  blockedKeywords String?  // JSON array
+  priceMin        Float?
+  priceMax        Float?
+  notes           String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  items           EbayScannedItem[]
+}
+
+model EbayScannedItem {
+  id              String          @id @default(cuid())
+  title           String
+  price           Float
+  itemUrl         String
+  imageUrl        String?
+  isInterested    Boolean         @default(false)
+  isBlocked       Boolean         @default(false)
+  notes           String?
+  
+  // Relationships
+  sessionId       String
+  session         EbayScanSession @relation(fields: [sessionId], references: [id])
+  
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+// Admin/Configuration Models
+model ApiConfiguration {
+  id          String   @id @default(cuid())
+  platform    String   @unique // 'ebay', 'tcgplayer', 'whatnot'
+  apiKey      String?
+  apiSecret   String?
+  accessToken String?
+  isActive    Boolean  @default(false)
+  config      String?  // JSON for platform-specific configs
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SystemSettings {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  description String?
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
