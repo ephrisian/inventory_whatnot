@@ -1,11 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, use } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Edit, Trash2, DollarSign, TrendingUp, Users } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
+import { PackTracking } from "@/components/ui/pack-tracking"
+import { PackSaleModal } from "@/components/ui/pack-sale-modal"
 
 interface Item {
   id: string
@@ -17,6 +19,8 @@ interface Item {
   status: string
   sku?: string
   notes?: string
+  itemType?: string
+  packsPerBox?: number
   category?: { name: string }
   fandom?: { name: string }
   sales: Array<{
@@ -41,17 +45,22 @@ interface Item {
   updatedAt: string
 }
 
-export default function ItemDetailPage({ params }: { params: { id: string } }) {
+export default function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const resolvedParams = use(params)
   const [item, setItem] = useState<Item | null>(null)
   const [loading, setLoading] = useState(true)
+  const [packSales, setPackSales] = useState<any[]>([])
+  const [showPackSaleModal, setShowPackSaleModal] = useState(false)
+  const [editingPackSale, setEditingPackSale] = useState<any>(null)
 
   useEffect(() => {
     fetchItem()
+    fetchPackSales()
   }, [])
 
   const fetchItem = async () => {
     try {
-      const response = await fetch(`/api/inventory/${params.id}`)
+      const response = await fetch(`/api/inventory/${resolvedParams.id}`)
       if (response.ok) {
         const data = await response.json()
         setItem(data)
@@ -63,6 +72,87 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchPackSales = async () => {
+    try {
+      const response = await fetch(`/api/pack-sales?parentItemId=${resolvedParams.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        setPackSales(data)
+      }
+    } catch (error) {
+      console.error('Error fetching pack sales:', error)
+    }
+  }
+
+  const handleAddPackSale = () => {
+    setShowPackSaleModal(true)
+  }
+
+  const handlePackSaleSubmit = async (packSaleData: any) => {
+    try {
+      const url = editingPackSale ? `/api/pack-sales/${editingPackSale.id}` : '/api/pack-sales'
+      const method = editingPackSale ? 'PUT' : 'POST'
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...packSaleData,
+          parentItemId: item?.id,
+        }),
+      })
+
+      if (response.ok) {
+        // Refresh pack sales and item data
+        await fetchPackSales()
+        await fetchItem()
+        setEditingPackSale(null)
+        console.log(`Pack sale ${editingPackSale ? 'updated' : 'recorded'} successfully`)
+      } else {
+        const errorData = await response.json()
+        console.error(`Failed to ${editingPackSale ? 'update' : 'record'} pack sale:`, errorData)
+      }
+    } catch (error) {
+      console.error(`Error ${editingPackSale ? 'updating' : 'recording'} pack sale:`, error)
+    }
+  }
+
+  const handleEditPackSale = (packSale: any) => {
+    setEditingPackSale(packSale)
+    setShowPackSaleModal(true)
+  }
+
+  const handleDeletePackSale = async (packSaleId: string) => {
+    if (!confirm('Are you sure you want to delete this pack sale?')) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/pack-sales/${packSaleId}`, {
+        method: 'DELETE',
+      })
+
+      if (response.ok) {
+        // Refresh pack sales and item data
+        await fetchPackSales()
+        await fetchItem()
+        console.log('Pack sale deleted successfully')
+      } else {
+        const errorData = await response.json()
+        console.error('Failed to delete pack sale:', errorData)
+      }
+    } catch (error) {
+      console.error('Error deleting pack sale:', error)
+    }
+  }
+
+  const handleCloseModal = () => {
+    setShowPackSaleModal(false)
+    setEditingPackSale(null)
   }
 
   const getStatusColor = (status: string) => {
@@ -186,7 +276,7 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
           </div>
         </div>
         <div className="flex space-x-2">
-          <Link href={`/inventory/${params.id}/edit`}>
+          <Link href={`/inventory/${resolvedParams.id}/edit`}>
             <Button variant="outline">
               <Edit className="h-4 w-4 mr-2" />
               Edit
@@ -403,17 +493,17 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href={`/sales/new?item=${params.id}`}>
+              <Link href={`/sales/new?item=${resolvedParams.id}`}>
                 <Button className="w-full" variant="outline">
                   Record Sale
                 </Button>
               </Link>
-              <Link href={`/interests/new?item=${params.id}`}>
+              <Link href={`/interests/new?item=${resolvedParams.id}`}>
                 <Button className="w-full" variant="outline">
                   Add Customer Interest
                 </Button>
               </Link>
-              <Link href={`/inventory/${params.id}/edit`}>
+              <Link href={`/inventory/${resolvedParams.id}/edit`}>
                 <Button className="w-full" variant="outline">
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Item
@@ -423,6 +513,30 @@ export default function ItemDetailPage({ params }: { params: { id: string } }) {
           </Card>
         </div>
       </div>
+
+      {/* Pack Tracking Section */}
+      {item && (
+        <PackTracking 
+          item={item} 
+          packSales={packSales} 
+          onAddPackSale={handleAddPackSale}
+          onEditPackSale={handleEditPackSale}
+          onDeletePackSale={handleDeletePackSale}
+          onRefresh={fetchPackSales}
+        />
+      )}
+
+      {/* Pack Sale Modal */}
+      {item && (
+        <PackSaleModal
+          isOpen={showPackSaleModal}
+          onClose={handleCloseModal}
+          onSubmit={handlePackSaleSubmit}
+          parentItem={item}
+          packNumber={packSales.length + 1}
+          editingSale={editingPackSale}
+        />
+      )}
     </div>
   )
 }

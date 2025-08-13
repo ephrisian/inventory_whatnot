@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Settings, Key, Shield, Database, Globe } from "lucide-react"
+import { Settings, Key, Shield, Database, Globe, Bell } from "lucide-react"
+import { useAdminSettings } from '@/hooks/useAdminSettings'
+import { useToast } from '@/components/ui/toast'
 
 interface ApiConfig {
   id: string
@@ -16,6 +18,56 @@ interface ApiConfig {
 export default function AdminPage() {
   const [apiConfigs, setApiConfigs] = useState<ApiConfig[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  
+  const { settings: adminSettings, loading: settingsLoading, updateSettings } = useAdminSettings()
+  const { addToast } = useToast()
+  
+  const [localSettings, setLocalSettings] = useState({
+    enableDeletionNotifications: adminSettings.enableDeletionNotifications,
+    deletionNotificationDuration: adminSettings.deletionNotificationDuration
+  })
+
+  // Update local settings when admin settings load
+  useEffect(() => {
+    setLocalSettings({
+      enableDeletionNotifications: adminSettings.enableDeletionNotifications,
+      deletionNotificationDuration: adminSettings.deletionNotificationDuration
+    })
+  }, [adminSettings])
+
+  const handleSaveNotificationSettings = async () => {
+    setSaving(true)
+    try {
+      const success = await updateSettings(localSettings)
+      if (success) {
+        addToast({
+          type: 'success',
+          title: 'Settings saved',
+          message: 'Notification settings have been updated successfully'
+        })
+      } else {
+        throw new Error('Failed to save settings')
+      }
+    } catch (error) {
+      addToast({
+        type: 'error',
+        title: 'Save failed',
+        message: 'Failed to save notification settings'
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const testNotification = () => {
+    addToast({
+      type: 'success',
+      title: 'Test deletion notification',
+      message: 'This is how deletion notifications will appear',
+      duration: localSettings.deletionNotificationDuration
+    })
+  }
 
   useEffect(() => {
     // Mock data for now - will connect to actual API
@@ -173,6 +225,68 @@ export default function AdminPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Notification Settings Card */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Bell className="h-5 w-5" />
+              <span>Deletion Notifications</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="enableDeletionNotifications"
+                  checked={localSettings.enableDeletionNotifications}
+                  onChange={(e) => setLocalSettings(prev => ({
+                    ...prev,
+                    enableDeletionNotifications: e.target.checked
+                  }))}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <label htmlFor="enableDeletionNotifications" className="text-sm font-medium text-gray-700">
+                  Enable deletion toast notifications
+                </label>
+              </div>
+
+              <div>
+                <label htmlFor="deletionNotificationDuration" className="block text-sm font-medium text-gray-700 mb-2">
+                  Notification duration (milliseconds)
+                </label>
+                <input
+                  type="number"
+                  id="deletionNotificationDuration"
+                  min="1000"
+                  max="30000"
+                  step="500"
+                  value={localSettings.deletionNotificationDuration}
+                  onChange={(e) => setLocalSettings(prev => ({
+                    ...prev,
+                    deletionNotificationDuration: parseInt(e.target.value) || 5000
+                  }))}
+                  className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+
+              <div className="flex space-x-3">
+                <Button onClick={handleSaveNotificationSettings} disabled={saving || settingsLoading}>
+                  {saving ? 'Saving...' : 'Save Settings'}
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  onClick={testNotification}
+                  disabled={!localSettings.enableDeletionNotifications}
+                >
+                  Test
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">

@@ -1,0 +1,8 @@
+name,description,cost,quantity,category,fandom,manufacturer,sku,notes,ebayPrice,whatnotPrice,discordPrice,otherPrice
+"Charizard Base Set Holo","First edition holographic Charizard card",150.00,1,"Trading Cards","Pokemon","Wizards of the Coast","POK-CHAR-001","Near mint condition",300.00,280.00,250.00,
+"Pikachu Promo Card","Special promotional Pikachu card",25.50,3,"Trading Cards","Pokemon","Pokemon Company","POK-PIKA-002","Excellent condition",45.00,42.00,40.00,
+"Spider-Man Action Figure","6-inch Spider-Man figure with web accessories",29.99,2,"Action Figures","Marvel","Hasbro","MAR-SPID-001","New in box",55.00,50.00,45.00,
+"Death Star Pin","Limited edition Death Star enamel pin",12.00,5,"Collectible Pins","Star Wars","Disney","SW-DS-PIN-001","Official Disney merchandise",25.00,23.00,20.00,
+"Aniplex SAO Doujin KB","Sword Art Online doujin card from Aniplex",23.00,0,"Trading Cards","Anime","Aniplex","ANI-SAO-001","Out of stock - needs reorder",36.00,40.00,35.00,
+"One Piece TCG Booster","One Piece trading card booster pack",8.99,12,"Trading Cards","One Piece","Kayou","OP-BOOST-001","New release",15.00,14.00,12.00,
+"Disney Lorcana Starter","Disney Lorcana starter deck",19.99,5,"Trading Cards","Disney","Ravensburger","DIS-LORC-001","First chapter",35.00,32.00,30.00,

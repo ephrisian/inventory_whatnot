@@ -1,12 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
-import { ArrowLeft, Save } from "lucide-react"
-import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Save, X } from "lucide-react"
 
 interface Category {
   id: string
@@ -18,8 +15,13 @@ interface Fandom {
   name: string
 }
 
-export default function NewItemPage() {
-  const router = useRouter()
+interface AddItemModalProps {
+  isOpen: boolean
+  onClose: () => void
+  onSuccess: () => void
+}
+
+export function AddItemModal({ isOpen, onClose, onSuccess }: AddItemModalProps) {
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [fandoms, setFandoms] = useState<Fandom[]>([])
@@ -46,9 +48,11 @@ export default function NewItemPage() {
   })
 
   useEffect(() => {
-    fetchCategories()
-    fetchFandoms()
-  }, [])
+    if (isOpen) {
+      fetchCategories()
+      fetchFandoms()
+    }
+  }, [isOpen])
 
   const fetchCategories = async () => {
     try {
@@ -76,8 +80,6 @@ export default function NewItemPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('🚀 Form submission started')
-    console.log('📝 Form data:', JSON.stringify(formData, null, 2))
     setLoading(true)
 
     try {
@@ -101,8 +103,6 @@ export default function NewItemPage() {
         otherPrice: formData.otherPrice ? parseFloat(formData.otherPrice) : null,
       }
 
-      console.log('📦 Payload to API:', JSON.stringify(payload, null, 2))
-
       const response = await fetch('/api/inventory', {
         method: 'POST',
         headers: {
@@ -110,21 +110,35 @@ export default function NewItemPage() {
         },
         body: JSON.stringify(payload),
       })
-
-      console.log('📡 API Response status:', response.status)
       
       if (response.ok) {
-        const result = await response.json()
-        console.log('✅ Item created successfully:', result)
-        console.log('🔄 Redirecting to inventory page...')
-        router.push('/inventory')
+        // Reset form
+        setFormData({
+          name: "",
+          sku: "",
+          cost: "",
+          quantity: "",
+          categoryId: "",
+          fandomId: "",
+          manufacturer: "",
+          description: "",
+          notes: "",
+          location: "",
+          ebayPrice: "",
+          whatnotPrice: "",
+          discordPrice: "",
+          otherPrice: "",
+          itemType: "single",
+          packsPerBox: "1",
+          marketPrice: ""
+        })
+        setShowAdditionalPlatforms(false)
+        onSuccess()
+        onClose()
       } else {
         const errorData = await response.json()
         const errorMessage = errorData.error || 'Unknown error occurred'
-        const errorDetails = errorData.details ? `\n\nDetails: ${errorData.details}` : ''
-        
-        console.error('API Error:', errorData)
-        alert(`Error creating item: ${errorMessage}${errorDetails}`)
+        alert(`Error creating item: ${errorMessage}`)
       }
     } catch (error) {
       console.error('Error creating item:', error)
@@ -143,7 +157,6 @@ export default function NewItemPage() {
       if (field === 'cost' && value && parseFloat(value) > 0) {
         const cost = parseFloat(value)
         const retailPrice = cost * 1.3 // 30% markup
-        // Set WhatNot price to retail price by default
         updated.whatnotPrice = retailPrice.toFixed(2)
       }
       
@@ -151,40 +164,35 @@ export default function NewItemPage() {
     })
   }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center space-x-4">
-        <Link href="/inventory">
-          <Button variant="outline" size="sm">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Inventory
-          </Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Add New Item</h1>
-          <p className="text-gray-600">Add a new item to your inventory</p>
-        </div>
-      </div>
+  if (!isOpen) return null
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>Item Details</CardTitle>
-            <div className="flex items-center space-x-2">
-              <label htmlFor="platform-switch" className="text-sm font-medium text-gray-700">
-                More Platforms
-              </label>
-              <Switch
-                id="platform-switch"
-                checked={showAdditionalPlatforms}
-                onCheckedChange={setShowAdditionalPlatforms}
-              />
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center justify-between w-full">
+            <h2 className="text-xl font-semibold text-gray-900">Add New Item</h2>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <label htmlFor="platform-switch" className="text-sm font-medium text-gray-700">
+                  More Platforms
+                </label>
+                <Switch
+                  id="platform-switch"
+                  checked={showAdditionalPlatforms}
+                  onCheckedChange={setShowAdditionalPlatforms}
+                />
+              </div>
+              <Button variant="outline" size="sm" onClick={onClose}>
+                <X className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+
+        <div className="p-6">
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Item Name *
@@ -280,7 +288,7 @@ export default function NewItemPage() {
                     />
                   </div>
                 ) : (
-                  <div></div> // Empty div to maintain grid structure
+                  <div></div>
                 )}
               </div>
 
@@ -489,20 +497,18 @@ export default function NewItemPage() {
               </div>
             </div>
 
-            <div className="flex space-x-4">
+            <div className="flex space-x-4 pt-4 border-t">
               <Button type="submit" disabled={loading}>
                 <Save className="h-4 w-4 mr-2" />
                 {loading ? 'Creating...' : 'Create Item'}
               </Button>
-              <Link href="/inventory">
-                <Button type="button" variant="outline">
-                  Cancel
-                </Button>
-              </Link>
+              <Button type="button" variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   )
 }

@@ -73,9 +73,9 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex flex-col w-64 bg-white shadow-lg">
+    <div className="flex flex-col w-64 bg-card border-r">
       <div className="flex items-center justify-center h-16 px-4 border-b">
-        <h1 className="text-xl font-bold text-gray-800">
+        <h1 className="text-xl font-bold text-foreground">
           Collector Manager
         </h1>
       </div>
@@ -89,8 +89,8 @@ export function Sidebar() {
               className={cn(
                 "flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors",
                 isActive
-                  ? "bg-blue-100 text-blue-700"
-                  : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
             >
               <item.icon className="mr-3 h-5 w-5" />

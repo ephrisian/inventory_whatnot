@@ -1,76 +1,31 @@
-import { NextRequest, NextResponse } from 'next/server'
+ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { z } from 'zod'
+import { calculateIntelligentPricing } from '@/lib/pricing'
 
-const itemSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
-  cost: z.number().positive(),
-  quantity: z.number().int().min(0),
-  categoryId: z.string().optional(),
-  fandomId: z.string().optional(),
-  sku: z.string().optional(),
-  notes: z.string().optional(),
-})
-
-export async function GET(request: NextRequest) {
+export async function GET() {
+  console.log('🔍 GET /api/inventory - Fetching items...')
   try {
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    const search = searchParams.get('search') || ''
-    const category = searchParams.get('category') || ''
-    const status = searchParams.get('status') || ''
-
-    const skip = (page - 1) * limit
-
-    const where = {
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' as const } },
-          { description: { contains: search, mode: 'insensitive' as const } },
-          { sku: { contains: search, mode: 'insensitive' as const } },
-        ],
-      }),
-      ...(category && { categoryId: category }),
-      ...(status && { status: status as any }),
-    }
-
-    const [items, total] = await Promise.all([
-      prisma.item.findMany({
-        where,
-        include: {
-          category: true,
-          fandom: true,
-          sales: {
-            orderBy: { saleDate: 'desc' },
-            take: 1,
-          },
-        },
-        orderBy: { updatedAt: 'desc' },
-        skip,
-        take: limit,
-      }),
-      prisma.item.count({ where }),
-    ])
-
-    // Calculate total value for each item
-    const itemsWithValue = items.map(item => ({
-      ...item,
-      totalValue: item.cost * item.quantity,
-    }))
-
-    return NextResponse.json({
-      items: itemsWithValue,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
+    const items = await prisma.item.findMany({
+      include: {
+        category: true,
+        packSales: {
+          select: {
+            id: true,
+            soldPrice: true,
+            netProfit: true,
+            saleDate: true,
+          }
+        }
       },
+      orderBy: {
+        createdAt: 'desc'
+      }
     })
+    console.log(`✅ GET /api/inventory - Found ${items.length} items`)
+    console.log('📊 Items preview:', items.slice(0, 2).map(item => ({ id: item.id, name: item.name, cost: item.cost })))
+    return NextResponse.json(items)
   } catch (error) {
-    console.error('Error fetching items:', error)
+    console.error('❌ GET /api/inventory - Error fetching items:', error)
     return NextResponse.json(
       { error: 'Failed to fetch items' },
       { status: 500 }
@@ -79,53 +34,115 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🚀 POST /api/inventory - Creating new item...')
   try {
-    const body = await request.json()
-    const validatedData = itemSchema.parse(body)
-
-    // Generate SKU if not provided
-    if (!validatedData.sku) {
-      const category = validatedData.categoryId 
-        ? await prisma.category.findUnique({ where: { id: validatedData.categoryId } })
-        : null
+    const data = await request.json()
+    console.log('📝 Request data:', JSON.stringify(data, null, 2))
+    
+    // Calculate pricing automatically if cost is provided
+    let calculatedPricing = {}
+    if (data.cost && data.cost > 0) {
+      console.log('💰 Calculating pricing for cost:', data.cost)
+      const pricingResult = calculateIntelligentPricing({
+        cost: data.cost,
+        itemType: data.itemType || 'single',
+        packsPerBox: data.packsPerBox || 1,
+        marketPrice: data.marketPrice,
+        categoryConfig: {
+          baseMarkupPercent: 30,
+          packMarkupPercent: 25,
+          packGroupSize: 5,
+          useMarketPricing: false
+        },
+        platformFees: {
+          whatnot: 12,
+          ebay: 13,
+          discord: 0
+        }
+      })
       
-      const baseSku = `${category?.name.substring(0, 3).toUpperCase() || 'GEN'}-${validatedData.name.replace(/[^a-zA-Z0-9]/g, '').substring(0, 8).toUpperCase()}`
-      let sku = baseSku
-      let counter = 1
-      
-      // Ensure SKU is unique
-      while (await prisma.item.findUnique({ where: { sku } })) {
-        sku = `${baseSku}-${counter.toString().padStart(3, '0')}`
-        counter++
+      calculatedPricing = {
+        retailPrice: pricingResult.retailPrice,
+        packPrice: pricingResult.packPrice,
+        packGroupPrice: pricingResult.packGroupPrice
       }
-      
-      validatedData.sku = sku
+      console.log('📊 Calculated pricing:', calculatedPricing)
     }
 
+    console.log('🗃️ Creating item in database...')
     const item = await prisma.item.create({
       data: {
-        ...validatedData,
-        totalValue: validatedData.cost * validatedData.quantity,
+        name: data.name,
+        description: data.description,
+        manufacturer: data.manufacturer || null,
+        category: data.categoryId ? {
+          connect: { id: data.categoryId }
+        } : undefined,
+        fandom: data.fandomId ? {
+          connect: { id: data.fandomId }
+        } : undefined,
+        cost: data.cost || 0,
+        quantity: data.quantity || 0,
+        location: data.location || null,
+        notes: data.notes || null,
+        status: data.status || 'IN_STOCK',
+        imageUrl: data.imageUrl || null,
+        itemType: data.itemType || 'single',
+        packsPerBox: data.packsPerBox || 1,
+        marketPrice: data.marketPrice || null,
+        // Auto-calculated pricing
+        ...calculatedPricing
       },
       include: {
         category: true,
         fandom: true,
-      },
+      }
     })
-
-    return NextResponse.json(item, { status: 201 })
+    
+    console.log('✅ Item created successfully:', { 
+      id: item.id, 
+      name: item.name, 
+      cost: item.cost,
+      retailPrice: item.retailPrice,
+      quantity: item.quantity 
+    })
+    return NextResponse.json(item)
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'Validation failed', details: error.issues },
-        { status: 400 }
-      )
-    }
-
     console.error('Error creating item:', error)
+    
+    // Provide more detailed error messages
+    let errorMessage = 'Failed to create item'
+    let statusCode = 500
+    
+    if (error instanceof Error) {
+      errorMessage = error.message
+      
+      // Handle specific Prisma errors
+      if (error.message.includes('Unique constraint')) {
+        errorMessage = 'An item with this SKU already exists'
+        statusCode = 400
+      } else if (error.message.includes('Foreign key constraint')) {
+        errorMessage = 'Invalid category or fandom selected'
+        statusCode = 400
+      } else if (error.message.includes('manufacturer')) {
+        errorMessage = 'Manufacturer field issue: ' + error.message
+        statusCode = 400
+      } else if (error.message.includes('itemType')) {
+        errorMessage = 'Invalid item type. Must be single, pack, or box'
+        statusCode = 400
+      } else if (error.message.includes('retailPrice') || error.message.includes('packPrice')) {
+        errorMessage = 'Pricing calculation error: ' + error.message
+        statusCode = 400
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to create item' },
-      { status: 500 }
+      { 
+        error: errorMessage,
+        details: error instanceof Error ? error.message : 'Unknown error',
+        stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+      },
+      { status: statusCode }
     )
   }
 }

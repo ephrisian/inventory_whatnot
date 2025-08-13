@@ -13,6 +13,8 @@ datasource db {
 // Enums
 enum ItemStatus {
   IN_STOCK
+  LOW_STOCK
+  OUT_OF_STOCK
   SOLD
   RESERVED
   NEEDS_RESTOCK
@@ -48,12 +50,29 @@ enum FollowupStatus {
   COMPLETED
 }
 
+// Platform fee configuration
+model PlatformConfig {
+  id          String   @id @default(cuid())
+  platform    Platform @unique
+  feePercent  Float    // Platform fee percentage (e.g., 12 for 12%)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // Core Models
 model Category {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
   color       String?  // For UI display
+  
+  // Pricing configuration
+  baseMarkupPercent   Float?   @default(0)    // Base markup percentage (e.g., 30 for 30%)
+  packMarkupPercent   Float?   @default(25)   // Additional markup for packs (e.g., 25 for 25%)
+  packGroupSize       Int?     @default(3)    // How many packs to group together
+  useMarketPricing    Boolean  @default(false) // Use external market data vs markup
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   
@@ -75,12 +94,40 @@ model Item {
   id          String     @id @default(cuid())
   name        String
   description String?
-  cost        Float
+  cost        Float      // Your purchase/cost price
   quantity    Int        @default(0)
   images      String?    // JSON array of image URLs/paths
   status      ItemStatus @default(IN_STOCK)
   sku         String?    @unique
   notes       String?
+  location    String?    // Physical location or storage info
+  imageUrl    String?    // Single image URL (keeping for compatibility)
+  manufacturer String?   // Kayou, Kakawow, Lorcana, Aniplex, etc.
+  
+  // Product specifications
+  itemType    String?    // "box", "pack", "single", "case", etc.
+  packsPerBox Int?       // How many packs in a box (if itemType is "box")
+  marketPrice Float?     // External market price (TCGPlayer, etc.)
+  
+  // Auto-calculated pricing (computed fields)
+  retailPrice     Float? // Final retail price with all markups
+  packPrice       Float? // Price per individual pack (if box)
+  packGroupPrice  Float? // Price for pack groups (e.g., 3-pack)
+  
+  // Pack tracking fields (computed)
+  packsSold       Int?   // Number of individual packs sold from this box
+  packsRemaining  Int?   // packsPerBox - packsSold (if itemType is "box")
+  totalPackRevenue Float? // Sum of all pack sales from this box
+  avgPackPrice    Float? // Average price per pack sold
+  projectedRevenue Float? // Estimated total revenue if all packs sell at avg price
+  
+  // Platform-specific pricing (legacy - keeping for migration)
+  ebayPrice    Float?    
+  whatnotPrice Float?    
+  discordPrice Float?    
+  otherPrice   Float?    
+  ebayNetPrice    Float? 
+  whatnotNetPrice Float? 
   
   // Relationships
   categoryId  String?
@@ -95,6 +142,7 @@ model Item {
   
   // Relations
   sales       Sale[]
+  packSales   PackSale[]  // Individual pack sales from this item
   orderItems  VendorOrderItem[]
   packItems   PackItem[]
   customerInterests CustomerInterest[]
@@ -119,6 +167,35 @@ model Sale {
   // Relationships
   itemId        String
   item          Item     @relation(fields: [itemId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// Track individual pack sales from boxes
+model PackSale {
+  id            String   @id @default(cuid())
+  platform      Platform
+  soldPrice     Float    // Price this individual pack sold for
+  shippingCost  Float    @default(0)
+  materialsCost Float    @default(0)
+  platformFeePercent Float @default(0)
+  platformFeeFlat    Float @default(0)
+  saleDate      DateTime @default(now())
+  notes         String?
+  
+  // Pack-specific tracking
+  packNumber    Int?     // Which pack number from the box (1, 2, 3, etc.)
+  
+  // Calculated fields
+  costPerPack      Float? // parentItem.cost / parentItem.packsPerBox
+  platformFeeTotal Float? // (soldPrice * platformFeePercent/100) + platformFeeFlat
+  breakEvenPrice   Float? // costPerPack + materialsCost + shippingCost + platformFeeTotal
+  netProfit        Float? // soldPrice - costPerPack - materialsCost - shippingCost - platformFeeTotal
+  
+  // Relationships
+  parentItemId  String   // The box/item this pack came from
+  parentItem    Item     @relation(fields: [parentItemId], references: [id])
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

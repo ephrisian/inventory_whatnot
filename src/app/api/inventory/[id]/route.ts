@@ -4,23 +4,33 @@ import { z } from 'zod'
 
 const itemUpdateSchema = z.object({
   name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  cost: z.number().positive().optional(),
+  description: z.string().nullable().optional(),
+  cost: z.number().min(0).optional(),
   quantity: z.number().int().min(0).optional(),
-  categoryId: z.string().optional(),
-  fandomId: z.string().optional(),
-  sku: z.string().optional(),
-  notes: z.string().optional(),
-  status: z.enum(['IN_STOCK', 'SOLD', 'RESERVED', 'NEEDS_RESTOCK', 'DISCONTINUED']).optional(),
+  categoryId: z.string().nullable().optional(),
+  fandomId: z.string().nullable().optional(),
+  sku: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  manufacturer: z.string().nullable().optional(),
+  location: z.string().nullable().optional(),
+  itemType: z.string().optional(),
+  packsPerBox: z.number().int().min(1).optional(),
+  marketPrice: z.number().min(0).nullable().optional(),
+  ebayPrice: z.number().min(0).nullable().optional(),
+  whatnotPrice: z.number().min(0).nullable().optional(),
+  discordPrice: z.number().min(0).nullable().optional(),
+  otherPrice: z.number().min(0).nullable().optional(),
+  status: z.enum(['IN_STOCK', 'LOW_STOCK', 'OUT_OF_STOCK', 'SOLD', 'RESERVED', 'NEEDS_RESTOCK', 'DISCONTINUED']).optional(),
 })
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const item = await prisma.item.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         category: true,
         fandom: true,
@@ -57,15 +67,16 @@ export async function GET(
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
     const validatedData = itemUpdateSchema.parse(body)
 
     // Check if item exists
     const existingItem = await prisma.item.findUnique({
-      where: { id: params.id },
+      where: { id },
     })
 
     if (!existingItem) {
@@ -94,12 +105,40 @@ export async function PUT(
     const newQuantity = validatedData.quantity ?? existingItem.quantity
     const totalValue = newCost * newQuantity
 
+    // Prepare update data with proper relationship handling
+    const updateData: Record<string, unknown> = {
+      ...validatedData,
+      totalValue,
+      // Calculate net prices after platform fees
+      ...(validatedData.ebayPrice && { ebayNetPrice: validatedData.ebayPrice * 0.87 }),
+      ...(validatedData.whatnotPrice && { whatnotNetPrice: validatedData.whatnotPrice * 0.89 }),
+    }
+
+    // Handle category relationship
+    if (validatedData.categoryId !== undefined) {
+      if (validatedData.categoryId === null) {
+        updateData.category = { disconnect: true }
+        delete updateData.categoryId
+      } else {
+        updateData.category = { connect: { id: validatedData.categoryId } }
+        delete updateData.categoryId
+      }
+    }
+
+    // Handle fandom relationship
+    if (validatedData.fandomId !== undefined) {
+      if (validatedData.fandomId === null) {
+        updateData.fandom = { disconnect: true }
+        delete updateData.fandomId
+      } else {
+        updateData.fandom = { connect: { id: validatedData.fandomId } }
+        delete updateData.fandomId
+      }
+    }
+
     const updatedItem = await prisma.item.update({
-      where: { id: params.id },
-      data: {
-        ...validatedData,
-        totalValue,
-      },
+      where: { id },
+      data: updateData,
       include: {
         category: true,
         fandom: true,
@@ -125,12 +164,14 @@ export async function PUT(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
+    
     // Check if item exists
     const existingItem = await prisma.item.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         sales: true,
         customerInterests: true,
@@ -148,7 +189,7 @@ export async function DELETE(
     if (existingItem.sales.length > 0 || existingItem.customerInterests.length > 0) {
       // Soft delete - mark as discontinued instead of hard delete
       const updatedItem = await prisma.item.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           status: 'DISCONTINUED',
           quantity: 0,
@@ -163,7 +204,7 @@ export async function DELETE(
     } else {
       // Hard delete if no dependencies
       await prisma.item.delete({
-        where: { id: params.id },
+        where: { id },
       })
 
       return NextResponse.json({
