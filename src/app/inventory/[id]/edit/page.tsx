@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, use } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Switch } from "@/components/ui/switch"
 import { ArrowLeft, Save, Trash2, Eye } from "lucide-react"
 import Link from "next/link"
 import { formatCurrency, formatDate } from "@/lib/utils"
@@ -355,8 +356,8 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="p-3 sm:p-6 space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
           <Link href="/inventory">
             <Button variant="outline" size="sm">
@@ -365,7 +366,7 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Edit Item</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Edit Item</h1>
             <p className="text-muted-foreground">Update item details</p>
           </div>
         </div>
@@ -387,13 +388,25 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>
-              <CardTitle>Item Details</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle>Item Details</CardTitle>
+                <div className="flex items-center space-x-2">
+                  <label htmlFor="platform-switch" className="text-sm font-medium text-muted-foreground">
+                    More Platforms
+                  </label>
+                  <Switch
+                    id="platform-switch"
+                    checked={showAdditionalPlatforms}
+                    onCheckedChange={setShowAdditionalPlatforms}
+                  />
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
+                    <label className="block text-sm font-medium text-foreground mb-1">
                       Item Name *
                     </label>
                     <input
@@ -401,104 +414,195 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
                       required
                       value={formData.name}
                       onChange={(e) => handleChange('name', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                       placeholder="Enter item name"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      SKU
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.sku}
-                      onChange={(e) => handleChange('sku', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Auto-generated if left empty"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Cost *
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      required
-                      value={formData.cost}
-                      onChange={(e) => handleChange('cost', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Item Type
-                    </label>
-                    <select
-                      value={formData.itemType}
-                      onChange={(e) => handleChange('itemType', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="single">Single Item</option>
-                      <option value="pack">Pack</option>
-                      <option value="box">Box</option>
-                    </select>
-                  </div>
-
-                  {formData.itemType === 'box' && (
+                  {/* Cost, Quantity, Item Type, WhatNot Price, Status in one row */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        Packs per Box
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Cost *
                       </label>
                       <input
                         type="number"
-                        min="1"
-                        value={formData.packsPerBox}
-                        onChange={(e) => handleChange('packsPerBox', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="1"
+                        step="0.01"
+                        min="0"
+                        required
+                        value={formData.cost}
+                        onChange={(e) => handleChange('cost', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="0.00"
                       />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Quantity *
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="999"
+                        required
+                        value={formData.quantity}
+                        onChange={(e) => handleChange('quantity', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="0"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Item Type
+                      </label>
+                      <select
+                        value={formData.itemType}
+                        onChange={(e) => handleChange('itemType', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="single">Single</option>
+                        <option value="pack">Pack</option>
+                        <option value="box">Box</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        WhatNot Price
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="999"
+                        value={formData.whatnotPrice}
+                        onChange={(e) => handleChange('whatnotPrice', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="Auto"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Status
+                      </label>
+                      <select
+                        value={formData.status}
+                        onChange={(e) => handleChange('status', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="IN_STOCK">In Stock</option>
+                        <option value="RESERVED">Reserved</option>
+                        <option value="NEEDS_RESTOCK">Needs Restock</option>
+                        <option value="DISCONTINUED">Discontinued</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Packs Per Box field for box type */}
+                  {formData.itemType === 'box' && (
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-foreground mb-1">
+                          Packs per Box
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          max="999"
+                          value={formData.packsPerBox}
+                          onChange={(e) => handleChange('packsPerBox', e.target.value)}
+                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                          placeholder="1"
+                        />
+                      </div>
                     </div>
                   )}
 
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Status
-                    </label>
-                    <select
-                      value={formData.status}
-                      onChange={(e) => handleChange('status', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="IN_STOCK">In Stock</option>
-                      <option value="RESERVED">Reserved</option>
-                      <option value="NEEDS_RESTOCK">Needs Restock</option>
-                      <option value="DISCONTINUED">Discontinued</option>
-                    </select>
+                  {/* SKU, Category, Fandom, Manufacturer in one row */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        SKU
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.sku}
+                        onChange={(e) => handleChange('sku', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="Auto-generated"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={formData.categoryId}
+                        onChange={(e) => handleChange('categoryId', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Select category</option>
+                        {categories.map((category) => (
+                          <option key={category.id} value={category.id}>
+                            {category.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Fandom
+                      </label>
+                      <select
+                        value={formData.fandomId}
+                        onChange={(e) => handleChange('fandomId', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      >
+                        <option value="">Select fandom</option>
+                        {fandoms.map((fandom) => (
+                          <option key={fandom.id} value={fandom.id}>
+                            {fandom.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-foreground mb-1">
+                        Manufacturer
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.manufacturer}
+                        onChange={(e) => handleChange('manufacturer', e.target.value)}
+                        className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                        placeholder="e.g., Kayou, Kakawow"
+                      />
+                    </div>
                   </div>
 
                   {/* Auto-calculated pricing preview */}
                   {formData.cost && parseFloat(formData.cost) > 0 && (
-                    <div className="bg-accent/20 p-4 rounded-lg">
-                      <h4 className="font-medium text-accent-foreground mb-2">Auto-calculated Pricing (30% markup)</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+                    <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-md">
+                      <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2 text-sm">Auto-calculated Pricing (30% markup)</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
                         <div>
-                          <span className="text-muted-foreground">Retail: </span>
+                          <span className="text-blue-700 dark:text-blue-300">Retail: </span>
                           <span className="font-medium">${(parseFloat(formData.cost) * 1.3).toFixed(2)}</span>
                         </div>
                         {formData.itemType === 'pack' && (
                           <>
                             <div>
-                              <span className="text-muted-foreground">Pack Price: </span>
+                              <span className="text-blue-700 dark:text-blue-300">Pack Price: </span>
                               <span className="font-medium">${(parseFloat(formData.cost) * 1.3).toFixed(2)}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Group (5+): </span>
+                              <span className="text-blue-700 dark:text-blue-300">Group (5+): </span>
                               <span className="font-medium">${(parseFloat(formData.cost) * 1.3 * 0.9).toFixed(2)}</span>
                             </div>
                           </>
@@ -506,11 +610,11 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
                         {formData.itemType === 'box' && formData.packsPerBox && parseInt(formData.packsPerBox) > 1 && (
                           <>
                             <div>
-                              <span className="text-muted-foreground">Pack Price: </span>
+                              <span className="text-blue-700 dark:text-blue-300">Pack Price: </span>
                               <span className="font-medium">${(parseFloat(formData.cost) / parseInt(formData.packsPerBox) * 1.3).toFixed(2)}</span>
                             </div>
                             <div>
-                              <span className="text-muted-foreground">Group (5+): </span>
+                              <span className="text-blue-700 dark:text-blue-300">Group (5+): </span>
                               <span className="font-medium">${(parseFloat(formData.cost) / parseInt(formData.packsPerBox) * 1.3 * 0.9).toFixed(2)}</span>
                             </div>
                           </>
@@ -520,57 +624,26 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
                   )}
                 </div>
 
-                {/* Platform Pricing Section */}
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium text-foreground border-b pb-2">Platform Pricing</h3>
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setShowAdditionalPlatforms(!showAdditionalPlatforms)}
-                    >
-                      {showAdditionalPlatforms ? 'Hide' : 'Show'} Additional Platforms
-                    </Button>
-                  </div>
+                {/* Platform Pricing Section - only show if toggle is enabled */}
+                {showAdditionalPlatforms && (
+                  <div className="space-y-3">
+                    <h3 className="text-lg font-semibold text-foreground mb-3">
+                      Platform Pricing
+                    </h3>
                   
-                  {/* Primary WhatNot Pricing */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-foreground mb-2">
-                        WhatNot Price (before 11% fee)
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={formData.whatnotPrice}
-                        onChange={(e) => handleChange('whatnotPrice', e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Auto-calculated from cost + 30% markup"
-                      />
-                      {formData.whatnotPrice && formData.cost && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Net profit: ${(parseFloat(formData.whatnotPrice) * 0.89 - parseFloat(formData.cost)).toFixed(2)}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Additional Platforms (Hidden by default) */}
-                  {showAdditionalPlatforms && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                           eBay Price (before 13% fee)
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
+                          max="999"
                           value={formData.ebayPrice}
                           onChange={(e) => handleChange('ebayPrice', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                           placeholder="0.00"
                         />
                         {formData.ebayPrice && formData.cost && (
@@ -581,16 +654,17 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                           Discord/Direct Sale Price
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
+                          max="999"
                           value={formData.discordPrice}
                           onChange={(e) => handleChange('discordPrice', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                           placeholder="0.00"
                         />
                         {formData.discordPrice && formData.cost && (
@@ -601,16 +675,17 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-foreground mb-2">
+                        <label className="block text-sm font-medium text-foreground mb-1">
                           Other Platform Price
                         </label>
                         <input
                           type="number"
                           step="0.01"
                           min="0"
+                          max="999"
                           value={formData.otherPrice}
                           onChange={(e) => handleChange('otherPrice', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-2 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                           placeholder="0.00"
                         />
                         {formData.otherPrice && formData.cost && (
@@ -620,99 +695,35 @@ export default function EditItemPage({ params }: { params: Promise<{ id: string 
                         )}
                       </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Quantity *
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Description
                     </label>
-                    <input
-                      type="number"
-                      min="0"
-                      required
-                      value={formData.quantity}
-                      onChange={(e) => handleChange('quantity', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0"
+                    <textarea
+                      value={formData.description}
+                      onChange={(e) => handleChange('description', e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      placeholder="Enter item description"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Category
+                    <label className="block text-sm font-medium text-foreground mb-1">
+                      Notes
                     </label>
-                    <select
-                      value={formData.categoryId}
-                      onChange={(e) => handleChange('categoryId', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select a category</option>
-                      {categories.map((category) => (
-                        <option key={category.id} value={category.id}>
-                          {category.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Fandom
-                    </label>
-                    <select
-                      value={formData.fandomId}
-                      onChange={(e) => handleChange('fandomId', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="">Select a fandom</option>
-                      {fandoms.map((fandom) => (
-                        <option key={fandom.id} value={fandom.id}>
-                          {fandom.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-foreground mb-2">
-                      Manufacturer
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.manufacturer}
-                      onChange={(e) => handleChange('manufacturer', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="e.g., Kayou, Kakawow, Lorcana, Aniplex"
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => handleChange('notes', e.target.value)}
+                      rows={2}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                      placeholder="Additional notes"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => handleChange('description', e.target.value)}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Enter item description"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-2">
-                    Notes
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) => handleChange('notes', e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="Additional notes"
-                  />
                 </div>
 
                 <div className="flex space-x-4">
